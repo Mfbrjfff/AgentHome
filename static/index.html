@@ -152,8 +152,8 @@
             <button onclick="fillChat(this)">Summarise my health trends this month</button>
           </div>
           <form class="chat-input-row" onsubmit="sendChat(event)">
-            <button type="button" class="mic-btn" id="micBtn" title="Voice input">🎙</button>
-            <input id="chatInput" class="glass-input" placeholder="Message Atlas…" autocomplete="off">
+            <button type="button" class="mic-btn" id="ttsToggleBtn" title="Agent voice (text-to-speech) on/off">🔊</button>
+            <input id="chatInput" class="glass-input" placeholder="Message Atlas… (typed input — no microphone)" autocomplete="off">
             <button type="submit" class="glass-btn accent-violet send-btn">Send ↑</button>
           </form>
         </div>
@@ -228,6 +228,43 @@
         <article class="glass tile wide">
           <h3>Registered Agent Tools</h3>
           <div id="toolList" class="tool-chips">loading…</div>
+        </article>
+
+        <!-- ═══ VOICE · TEXT-TO-SPEECH (no speech-to-text — no mic) ═══ -->
+        <article class="glass tile wide voice-tile">
+          <h3>🗣 Voice — Text to Speech</h3>
+          <p class="tile-meta">Atlas speaks its replies. There is no voice input: this deployment has no microphone.</p>
+          <div class="voice-grid">
+            <label class="switch-row"><span>Auto-speak replies</span>
+              <label class="switch"><input type="checkbox" id="ttsEnabledSw" checked><span class="slider"></span></label>
+            </label>
+            <label>Language
+              <select id="ttsLangSel" class="glass-input">
+                <option value="en-US">English (US)</option><option value="en-GB">English (UK)</option>
+                <option value="lv-LV">Latviešu</option><option value="de-DE">Deutsch</option>
+                <option value="ru-RU">Русский</option><option value="lt-LT">Lietuvių</option>
+                <option value="es-ES">Español</option><option value="fr-FR">Français</option>
+              </select>
+            </label>
+            <label>Rate <input id="ttsRateInp" class="glass-input" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+            <label>Pitch <input id="ttsPitchInp" class="glass-input" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+          </div>
+          <div class="btn-row">
+            <button class="glass-btn" onclick="testTTS()">▶ Test voice</button>
+            <button class="glass-btn accent-violet" onclick="saveTTSSettings()">Save</button>
+          </div>
+          <p class="tile-meta" id="ttsEngineInfo">engine: —</p>
+        </article>
+
+        <!-- ═══ SKILLS · GITHUB / CLAWHUB INSTALLER ═══ -->
+        <article class="glass tile wide skills-tile">
+          <h3>🧩 Skills &amp; Autonomy</h3>
+          <p class="tile-meta">The agent can install skills from GitHub / ClawHub itself, author new tools with write_skill, edit its own code and use Bluetooth — maximum autonomy is enabled.</p>
+          <div class="skill-install-row">
+            <input id="skillSource" class="glass-input" placeholder="github.com/owner/repo/blob/main/skill.py  or  clawhub.ai/skills/my-skill">
+            <button class="glass-btn accent-violet" onclick="installSkill()">Install ↓</button>
+          </div>
+          <div id="skillList" class="skill-list">loading…</div>
         </article>
       </div>
     </section>

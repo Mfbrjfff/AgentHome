@@ -8,7 +8,9 @@
 const $ = (id) => document.getElementById(id);
 const GLOW_COLORS = { hue: "#ffb340", roidmi: "#4da3ff", withings: "#37e6a0",
                       spotify: "#2dd4bf", agent: "#a78bfa", weather: "#facc15",
-                      ha: "#38bdf8", system: "#94a3b8", web: "#f472b6" };
+                      ha: "#38bdf8", system: "#94a3b8", web: "#f472b6",
+                      skills: "#c084fc", bluetooth: "#60a5fa", tts: "#f87171",
+                      selfmod: "#fb923c" };
 
 let ws = null, wsRetry = 0;
 const state = { devices: {}, jobs: [], pendingBot: false };
@@ -44,6 +46,122 @@ function rippleTile(domain) {
   setTimeout(() => tile.classList.remove("lit"), 2600);
 }
 
+/* ───────────────────────── text-to-speech OUTPUT (no mic / no STT) ─────── */
+const tts = {
+  enabled: localStorage.getItem("atlas_tts") !== "off",
+  voices: [], voiceHint: "", rate: 1, pitch: 1, lang: "en-US", utter: null,
+  init() {
+    if (!("speechSynthesis" in window)) return;
+    const load = () => { this.voices = speechSynthesis.getVoices(); };
+    load(); speechSynthesis.onvoiceschanged = load;
+  },
+  pickVoice(lang) {
+    const exact = this.voices.find((v) => v.lang.toLowerCase() === (lang || "").toLowerCase());
+    if (exact) return exact;
+    const base = (lang || "en").slice(0, 2).toLowerCase();
+    return this.voices.find((v) => v.lang.toLowerCase().startsWith(base)) || null;
+  },
+  speak(text) {
+    if (!this.enabled || !("speechSynthesis" in window) || !text) return;
+    speechSynthesis.cancel();                       // interrupt previous line
+    const u = new SpeechSynthesisUtterance(String(text).slice(0, 900));
+    u.lang = this.lang; const v = this.pickVoice(this.lang); if (v) u.voice = v;
+    u.rate = this.rate; u.pitch = this.pitch;
+    this.utter = u;
+    u.onstart = () => setSpeaking(true);
+    u.onend = u.onerror = () => { setSpeaking(false); this.utter = null; };
+    speechSynthesis.speak(u);
+  },
+  stop() { if ("speechSynthesis" in window) speechSynthesis.cancel(); this.utter = null; setSpeaking(false); }
+};
+tts.init();
+
+function setSpeaking(on) {
+  const btn = $("ttsToggleBtn"); if (!btn) return;
+  btn.classList.toggle("speaking", on);
+  btn.textContent = on ? "🔈" : (tts.enabled ? "🔊" : "🔇");
+}
+
+$("ttsToggleBtn")?.addEventListener("click", () => {
+  tts.enabled = !tts.enabled;
+  localStorage.setItem("atlas_tts", tts.enabled ? "on" : "off");
+  if (!tts.enabled) tts.stop();
+  setSpeaking(false);
+  toast(tts.enabled ? "🔊 Atlas voice ON — replies will be spoken" : "🔇 Voice muted");
+});
+
+window.testTTS = () => tts.speak("Hello! I am Atlas. This is my text to speech voice. There is no microphone, so I only talk — you type.");
+
+window.saveTTSSettings = async () => {
+  const body = { enabled: $("ttsEnabledSw").checked, auto_reply: $("ttsEnabledSw").checked,
+                 lang: $("ttsLangSel").value, rate: parseFloat($("ttsRateInp").value),
+                 pitch: parseFloat($("ttsPitchInp").value) };
+  tts.enabled = body.enabled; localStorage.setItem("atlas_tts", body.enabled ? "on" : "off");
+  Object.assign(tts, { lang: body.lang, rate: body.rate, pitch: body.pitch });
+  try {
+    const j = await (await fetch("/api/tts/config", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    toast(j.ok ? "✦ Voice settings saved & synced server-side" : "⚠ " + (j.error || "failed"));
+    renderTTSState(j);
+  } catch (e) { toast("Network error: " + e.message); }
+};
+
+function renderTTSState(s) {
+  if (!s) return;
+  $("ttsEnabledSw").checked = !!(s.auto_reply ?? s.enabled);
+  if (s.lang) { $("ttsLangSel").value = s.lang; tts.lang = s.lang; }
+  if (s.rate != null) { $("ttsRateInp").value = s.rate; tts.rate = s.rate; }
+  if (s.pitch != null) { $("ttsPitchInp").value = s.pitch; tts.pitch = s.pitch; }
+  $("ttsEngineInfo").textContent =
+    `Pi engine: ${s.local_engine || "none (apt install espeak-ng)"} · browser voices: ${tts.voices.length}`;
+}
+
+async function loadTTSOnce() {
+  try { renderTTSState(await (await fetch("/api/tts/state")).json()); } catch (e) { /* ignore */ }
+}
+
+/* ───────────────────────── skills (GitHub / ClawHub) ────────────────────── */
+window.installSkill = async () => {
+  const src = $("skillSource").value.trim();
+  if (!src) return toast("Paste a GitHub or ClawHub skill URL first");
+  toast("⬇ Installing skill…"); liquidGlow("skills", false);
+  try {
+    const j = await (await fetch("/api/skills/install", { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: src }) })).json();
+    if (j.ok) { toast(`🧩 Skill “${j.file}” live — tools: ${(j.registered_tools || []).join(", ") || "see list"}`, 5000);
+      $("skillSource").value = ""; loadSkills(); toolsLoaded = false; loadToolsOnce(); }
+    else toast("⚠ " + (j.error || "install failed"), 5000);
+  } catch (e) { toast("Network error: " + e.message); }
+};
+
+async function loadSkills() {
+  try {
+    const d = await (await fetch("/api/skills")).json();
+    const box = $("skillList");
+    if (!d.skills || !d.skills.length) {
+      box.innerHTML = `<p style="color:var(--ink-dim)">No skills installed yet. The agent can self-install from GitHub/ClawHub, or paste a URL above.</p>`;
+      return;
+    }
+    box.innerHTML = d.skills.map((s) => `
+      <div class="skill-row glass-btn">
+        <span class="skill-ico">🧩</span>
+        <div class="skill-main"><b>${esc(s.file)}</b><small>${(s.size / 1024).toFixed(1)} KB</small></div>
+        <button class="glass-btn icon-btn" title="Reload" onclick="reloadSkill('${esc(s.file)}')">⟳</button>
+        <button class="glass-btn icon-btn danger" title="Remove" onclick="removeSkill('${esc(s.file)}')">✕</button>
+      </div>`).join("");
+  } catch (e) { /* ignore */ }
+}
+window.reloadSkill = async (file) => {
+  const j = await (await fetch("/api/skills/reload", { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file }) })).json();
+  toast(j.ok ? `⟳ ${file} reloaded` : "⚠ " + (j.error || "reload failed")); loadSkills();
+};
+window.removeSkill = async (file) => {
+  await fetch(`/api/skills/${encodeURIComponent(file)}`, { method: "DELETE" });
+  toast(`🗑 ${file} removed`); loadSkills();
+};
+
 /* ───────────────────────── tabs ───────────────────────────────────────── */
 document.querySelectorAll(".tab").forEach((btn) =>
   btn.addEventListener("click", () => {
@@ -52,7 +170,7 @@ document.querySelectorAll(".tab").forEach((btn) =>
       p.classList.toggle("active", p.id === "page-" + btn.dataset.tab));
     if (btn.dataset.tab === "analytics") loadAnalytics();
     if (btn.dataset.tab === "tasks") loadJobs();
-    if (btn.dataset.tab === "settings") { loadSystemOnce(); loadToolsOnce(); }
+    if (btn.dataset.tab === "settings") { loadSystemOnce(); loadToolsOnce(); loadTTSOnce(); loadSkills(); }
   }));
 
 $("fabTerm")?.addEventListener("click", () => {
@@ -85,7 +203,7 @@ function setConn(ok) {
 
 function handleMessage(m) {
   if (m.type === "log") return logLine(m.text, m.level, m.kind);
-  if (m.type === "chat_reply") return addMsg("bot", m.text);
+  if (m.type === "chat_reply") { addMsg("bot", m.text); tts.speak(m.text); return; }
   if (m.type === "snapshot") {
     state.devices = m.device_state || {};
     (m.recent || []).forEach((r) => r.type === "log" && logLine(r.text, r.level, r.kind));
@@ -96,6 +214,13 @@ function handleMessage(m) {
     const k = m.kind;
     state.devices[k] = Object.assign(state.devices[k] || {}, m.payload || {});
     if (m.glow) { liquidGlow(k); rippleTile(k); }
+    if (k === "tts" && m.event === "speak") {         // server says: speak now
+      if (m.payload && m.payload.lang) tts.lang = m.payload.lang;
+      if (m.payload && m.payload.rate != null) tts.rate = m.payload.rate;
+      if (m.payload && m.payload.pitch != null) tts.pitch = m.payload.pitch;
+      tts.speak(m.payload?.text || "");
+    }
+    if (k === "skills") loadSkills();
     renderDomain(k);
     if (k === "system") renderSystem(m.payload);
   }
@@ -154,16 +279,8 @@ function sendChat(ev) {
 }
 window.fillChat = (btn) => { $("chatInput").value = btn.textContent; $("chatInput").focus(); };
 
-/* voice input (Web Speech API) */
-const micBtn = $("micBtn");
-if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new SR(); rec.lang = "en-US"; rec.interimResults = false;
-  rec.onresult = (e) => { $("chatInput").value = e.results[0][0].transcript; sendChat(new Event("submit")); };
-  rec.onend = () => micBtn.classList.remove("recording");
-  micBtn.onclick = () => { micBtn.classList.toggle("recording");
-    micBtn.classList.contains("recording") ? rec.start() : rec.stop(); };
-} else micBtn.onclick = () => toast("Voice input needs Chrome/Safari.");
+/* ── voice INPUT removed on purpose: this deployment has NO microphone.
+      Only text-to-speech OUTPUT is implemented (see the tts engine above). */
 
 /* ───────────────────────── quick actions ──────────────────────────────── */
 window.quickTool = async (name, args) => {
@@ -463,4 +580,5 @@ setTimeout(() => { while (pendingChats.length) { const q = pendingChats.shift();
 connectWS();
 refreshOllama(); setInterval(refreshOllama, 30000);
 loadJobs(); setInterval(loadJobs, 60000);
-addMsg("bot", "Hi! I'm Atlas — your autonomous home agent. Ask me to control devices, schedule automations, or run a scenario. Tap ⚙ System for Pi vitals.");
+addMsg("bot", "Hi! I'm Atlas — your autonomous home agent. I can control devices, schedule automations, install skills from GitHub/ClawHub, use Bluetooth, edit my own code — and I speak my replies aloud (text-to-speech; no microphone here, so type instead). Tap ⚙ System for Pi vitals & voice settings.");
+tts.speak("Hello! I am Atlas, your autonomous home agent. I can talk to you now — text to speech is enabled.");

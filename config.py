@@ -98,6 +98,27 @@ class Settings:
     away_check_interval_min: int = int(_env("AWAY_CHECK_INTERVAL_MIN", "15"))
     away_clean_enabled: bool = _env_bool("AWAY_CLEAN_ENABLED", True)
 
+    # ------------------------------------------------------------- Autonomy
+    max_autonomy: bool = _env_bool("SH_AGENT_MAX_AUTONOMY", True)
+    """When True the agent may self-modify: edit its own tools/routines/config,
+    manage scheduled jobs freely, install skills from GitHub/ClawHub and use
+    Bluetooth — see tools/selfmod.py + tools/skills.py."""
+
+    skills_dir: str = _env("SH_SKILLS_DIR", "./skills")
+
+    # ------------------------------------------------------------------ TTS
+    tts_enabled: bool = _env_bool("SH_TTS_ENABLED", True)
+    """Speak every agent reply aloud (dashboard Web Speech API + espeak-ng on
+    the Pi + optional Google-Home announce). Voice-to-text is intentionally NOT
+    implemented — this deployment has no microphone."""
+    tts_voice: str = _env("SH_TTS_VOICE", "")            # name hint for browser voices
+    tts_rate: float = float(_env("SH_TTS_RATE", "1.0"))
+    tts_pitch: float = float(_env("SH_TTS_PITCH", "1.0"))
+    tts_lang: str = _env("SH_TTS_LANG", "en-US")
+    tts_max_chars: int = int(_env("SH_TTS_MAX_CHARS", "700"))
+    tts_auto_reply: bool = _env_bool("SH_TTS_AUTO_REPLY", True)
+    """When True, every agent chat reply is automatically spoken aloud."""
+
     # --------------------------------------------------------------- Runtime
     demo_mode: bool = _env_bool("SH_DEMO_MODE", not _env("HUE_BRIDGE_IP"))
     """When credentials/integrations are missing the tools transparently fall

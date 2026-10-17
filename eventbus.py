@@ -13,8 +13,11 @@ import time
 from collections import deque
 from typing import Any, Awaitable, Callable
 
+import httpx
+
 # Canonical glow categories understood by the frontend CSS engine
-GLOW_KINDS = {"hue", "spotify", "roidmi", "withings", "weather", "agent", "ha", "system"}
+GLOW_KINDS = {"hue", "spotify", "roidmi", "withings", "weather", "agent", "ha",
+              "system", "skills", "bluetooth", "tts"}
 
 
 class EventBus:
@@ -22,6 +25,22 @@ class EventBus:
         self._subscribers: list[Callable[[dict], Awaitable[None]]] = []
         self.history: deque[dict] = deque(maxlen=history_size)
         self.device_state: dict[str, Any] = {}   # latest known device snapshot per domain
+
+    async def http_get(self, url: str, timeout: float = 20.0,
+                       headers: dict | None = None) -> dict:
+        """Small shared GET helper (used by the skill installer & friends)."""
+        try:
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True,
+                                         headers=headers or {}) as c:
+                r = await c.get(url)
+                if r.status_code >= 400:
+                    return {"ok": False, "error": f"HTTP {r.status_code}", "status": r.status_code}
+                ct = r.headers.get("content-type", "")
+                if "json" in ct:
+                    return {"ok": True, "json": r.json(), "status": r.status_code}
+                return {"ok": True, "text": r.text, "status": r.status_code}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
     def subscribe(self, callback: Callable[[dict], Awaitable[None]]) -> None:
         self._subscribers.append(callback)

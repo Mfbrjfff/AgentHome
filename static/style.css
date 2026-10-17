@@ -475,3 +475,22 @@ html, body { margin: 0; padding: 0; height: 100%; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ════════ TTS / Voice tile ════════ */
+.mic-btn.speaking { animation: speaking-pulse 1s ease-in-out infinite; color:#f87171; }
+@keyframes speaking-pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(248,113,113,.5);} 50%{ box-shadow:0 0 0 10px rgba(248,113,113,0);} }
+.voice-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin:12px 0; }
+.switch-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px;
+  border-radius:14px; background:rgba(255,255,255,.05); }
+
+/* ════════ Skills tile ════════ */
+.skill-install-row { display:flex; gap:10px; margin:10px 0; }
+.skill-install-row .glass-input { flex:1; }
+.skill-list { display:flex; flex-direction:column; gap:8px; max-height:260px; overflow:auto; }
+.skill-row { display:flex; align-items:center; gap:12px; text-align:left; padding:8px 12px !important; }
+.skill-main { flex:1; display:flex; flex-direction:column; }
+.skill-main small { color:var(--ink-dim); }
+.glow-field.tint-skills   .blob-a { background:#4a1e78; opacity:.5; }
+.glow-field.tint-tts      .blob-d { background:#78281e; opacity:.45; }
+.glow-field.tint-bluetooth .blob-c { background:#123c78; opacity:.5; }
+.glow-field.tint-selfmod  .blob-b { background:#7a4a12; opacity:.45; }

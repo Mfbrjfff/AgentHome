@@ -36,6 +36,21 @@ def register(name: str, description: str, parameters: dict, domain: str = "gener
     return deco
 
 
+def tool(name: str, description: str, parameters: dict, domain: str = "general",
+         examples: list[str] | None = None):
+    """Positional-args sugar for register() — used by dynamic skill modules."""
+    return register(name=name, description=description, parameters=parameters,
+                    domain=domain, examples=examples)
+
+
+def unregister_prefix(prefix: str) -> list[str]:
+    """Remove every tool whose name starts with `prefix` (skill cleanup)."""
+    removed = [n for n in _REGISTRY if n.startswith(prefix)]
+    for n in removed:
+        del _REGISTRY[n]
+    return removed
+
+
 def all_tools() -> list[Tool]:
     return list(_REGISTRY.values())
 
@@ -77,4 +92,31 @@ async def invoke(name: str, arguments: dict | str | None) -> dict:
 
 def load_all() -> None:
     """Import AFTER register() exists so modules can decorate at import time."""
-    from . import hue, spotify, roidmi, withings, websearch, scheduler, ha_home, rpi_monitor  # noqa: F401
+    from . import (hue, spotify, roidmi, withings, websearch, scheduler,  # noqa: F401
+                   ha_home, rpi_monitor, skills, selfmod, tts)            # noqa: F401
+    load_installed_skills()
+
+
+def load_installed_skills() -> int:
+    """Import every ./skills/*.py file so previously installed skills are live
+    right after boot (hot-reloadable later via the skill_reload tool)."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+    from config import settings
+    sdir = Path(settings.skills_dir)
+    if not sdir.exists():
+        return 0
+    n = 0
+    for p in sorted(sdir.glob("*.py")):
+        mod_name = f"skills.{p.stem}"
+        try:
+            spec = importlib.util.spec_from_file_location(mod_name, p)
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[mod_name] = module
+                spec.loader.exec_module(module)
+                n += 1
+        except Exception as e:  # a broken skill must never block boot
+            print(f"[registry] skill {p.name} failed to load: {e}")
+    return n

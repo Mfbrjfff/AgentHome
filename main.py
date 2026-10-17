@@ -27,6 +27,8 @@ from models import (SessionLocal, init_db, ChatMessage, ScheduledJob,
 from tools.registry import load_all, all_tools, invoke
 from tools.scheduler import add_job, remove_job, restore_jobs, scheduler
 from tools.rpi_monitor import system_snapshot
+from tools.skills import SKILLS_DIR, installed_skills
+from tools.tts import tts_state
 import routines as rt
 
 BASE = Path(__file__).parent
@@ -129,6 +131,10 @@ async def ws_endpoint(ws: WebSocket):
                 if text:
                     reply = await _agent_turn(text)
                     await ws.send_text(json.dumps({"type": "chat_reply", "text": reply}))
+            elif msg.get("type") == "tts_result":
+                # browser reports what it spoke / speech errors → agent log
+                await bus.emit_log(f"🔊 dashboard {msg.get('status', 'spoke')}: "
+                                   f"{(msg.get('text') or '')[:60]}", kind="tts")
             elif msg.get("type") == "ping":
                 await ws.send_text(json.dumps({"type": "pong", "ts": time.time()}))
     except WebSocketDisconnect:
@@ -195,6 +201,58 @@ async def call_tool(name: str, args: dict = Body(default={})):
     return JSONResponse(result, status_code=200 if result.get("ok") else 502)
 
 
+# ---- skills & voice ---------------------------------------------------------
+@app.get("/api/skills")
+async def list_skills():
+    from tools.registry import get_tool
+    return {"dir": str(SKILLS_DIR), "skills": installed_skills(),
+            "autonomy": settings.max_autonomy,
+            "tools": [{"name": t.name, "domain": t.domain} for t in all_tools()]}
+
+
+@app.post("/api/skills/install")
+async def install_skill(payload: dict = Body(...)):
+    """Dashboard-side skill installer — routes through the same tool the agent uses."""
+    return await invoke("skill_install", {"source": payload.get("source", ""),
+                                          "name": payload.get("name", "")})
+
+
+@app.post("/api/skills/reload")
+async def reload_skill(payload: dict = Body(...)):
+    return await invoke("skill_reload", {"file": payload.get("file", "")})
+
+
+@app.delete("/api/skills/{file_name}")
+async def delete_skill(file_name: str):
+    return await invoke("remove_skill", {"file": file_name})
+
+
+@app.get("/api/tts/state")
+async def tts_get_state():
+    return tts_state()
+
+
+@app.post("/api/tts/speak")
+async def tts_speak(payload: dict = Body(...)):
+    """Speak arbitrary text now (dashboard 'speak' button / test phrase)."""
+    return await invoke("speak", {"text": payload.get("text", ""),
+                                  "google_home": bool(payload.get("google_home"))})
+
+
+@app.post("/api/tts/config")
+async def tts_set_config(payload: dict = Body(...)):
+    return await invoke("tts_config", payload)
+
+
+# ---- agent autonomy ----------------------------------------------------------
+@app.get("/api/autonomy")
+async def autonomy():
+    return {"max_autonomy": settings.max_autonomy,
+            "selfmod_tools": [t.name for t in all_tools() if t.domain in
+                              ("selfmod", "skills", "bluetooth", "tts")]}
+
+
+# ---- devices -----------------------------------------------------------------
 @app.get("/api/devices")
 async def devices():
     return bus.device_state | {"_recent_count": len(bus.history)}

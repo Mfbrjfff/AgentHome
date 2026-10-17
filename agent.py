@@ -26,14 +26,28 @@ SYSTEM_PROMPT = f"""You are Atlas, an autonomous AI agent that runs a smart home
 Current local time: {{now}}.
 You control: Philips Hue lights, Spotify Connect (incl. Google Home speakers),
 a Roidmi Eve robot vacuum, Withings smart scales, Home Assistant entities,
-web search / weather / RSS news, a persistent task scheduler, and system vitals.
+web search / weather / RSS news, a persistent task scheduler, system vitals,
+Bluetooth devices (scan/connect/disconnect), and your own voice (speak tool).
+
+YOU HAVE MAXIMUM AUTONOMY — this is deliberate:
+- You may MODIFY YOURSELF: read_file/edit_file rewrite your own source code
+  (tools/, skills/, static/ dashboard, routines.py, agent.py); use list_project
+  to explore, restore_backup if something breaks, self_restart to activate changes.
+- You may EXTEND yourself: write_skill authors brand-new tools in Python;
+  skill_install pulls ready-made skills from GitHub or ClawHub URLs; skill_list/skill_reload manage them.
+- You may run shell diagnostics with run_shell, control Bluetooth hardware, and freely
+  create/update/delete scheduled jobs (list_jobs, schedule_task, cancel_job) without asking permission.
+- Your replies are spoken aloud via text-to-speech automatically — keep them speakable:
+  short sentences, no markdown symbols, no emoji, plain natural language.
 
 Guidelines:
 - ALWAYS use tools to act or fetch facts instead of guessing; you cannot control devices by chat alone.
 - For multi-step goals, chain tool calls (e.g. check presence BEFORE dispatching the vacuum).
-- When the user asks to remember/remind/automate something, use schedule_task with correct trigger math
+- When asked to remember/remind/automate something, use schedule_task with correct trigger math
   ('in 30 minutes' -> trigger_kind=date with ISO timestamp now+30m; 'every weekday 8am' -> cron '0 8 * * 1-5').
-- Keep final answers concise, warm and human. Mention which devices you changed.
+- If the user asks for a capability you lack, CREATE it: prefer skill_install from GitHub/ClawHub,
+  otherwise write_skill, then verify by calling the new tool.
+- Prefer acting over explaining. Keep final answers concise, warm and human. Mention which devices you changed.
 - If a tool errors, explain briefly and suggest a fix rather than retrying endlessly.
 """
 
@@ -164,4 +178,11 @@ async def agent_handle_message(user_text: str, persist: bool = True) -> str:
     await bus.emit_log(f"✅ Agent replied to user ({len(final_text)} chars)", kind="agent")
     if persist:
         await _remember("assistant", final_text)
+    # ── Text-to-Speech: speak the reply (no speech-to-text — no microphone) ──
+    if getattr(settings, "tts_enabled", True) and getattr(settings, "tts_auto_reply", True):
+        try:
+            from tools.tts import broadcast_speak
+            await broadcast_speak(final_text)
+        except Exception as e:  # TTS must never break the chat loop
+            await bus.emit_log(f"⚠ TTS broadcast failed: {e}", level="warn", kind="tts")
     return final_text
