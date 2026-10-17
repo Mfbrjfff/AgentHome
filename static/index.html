@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d17">
+<title>Atlas · Smart Home Command Center</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { corePlugins: { preflight: false } };
+</script>
+</head>
+<body class="lg-body">
+
+<!-- ═══════════ DYNAMIC LIQUID GLOW LAYER (ambient mesh gradients) ═══════════ -->
+<div id="glowField" class="glow-field" aria-hidden="true">
+  <div class="blob blob-a"></div>
+  <div class="blob blob-b"></div>
+  <div class="blob blob-c"></div>
+  <div class="blob blob-d"></div>
+  <div class="shimmer"></div>
+</div>
+
+<div class="app-shell">
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <header class="glass lg-header">
+    <div class="brand">
+      <div class="brand-orb"><span></span></div>
+      <div>
+        <h1 class="brand-title">Atlas</h1>
+        <p class="brand-sub">Smart Home Autonomous Agent · Pi&nbsp;5</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="connPill" class="status-pill pill-idle"><i></i><span>connecting…</span></div>
+      <div id="modelPill" class="status-pill pill-idle"><i></i><span>bonsai-2:4b</span></div>
+      <nav class="tabbar glass-inner" role="tablist">
+        <button class="tab active" data-tab="dashboard">⌂ <span class="tab-label">Home</span></button>
+        <button class="tab" data-tab="agent">✦ <span class="tab-label">Agent</span></button>
+        <button class="tab" data-tab="tasks">◷ <span class="tab-label">Tasks</span></button>
+        <button class="tab" data-tab="analytics">∿ <span class="tab-label">Health</span></button>
+        <button class="tab" data-tab="settings">⚙ <span class="tab-label">System</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="pages">
+
+    <!-- ══════════════════ TAB 1 · DASHBOARD ══════════════════ -->
+    <section id="page-dashboard" class="page active">
+      <div class="tiles-grid">
+
+        <!-- Weather tile -->
+        <article class="glass tile" data-domain="weather">
+          <div class="tile-head"><span class="tile-icon">🌤️</span><h3>Weather</h3>
+            <span class="tile-badge" id="wxSource">—</span></div>
+          <div class="tile-hero"><span id="wxTemp">--°</span><small id="wCond">—</small></div>
+          <p class="tile-meta" id="wxMeta">humidity — · wind —</p>
+          <button class="glass-btn" onclick="quickTool('weather_forecast',{})">Refresh</button>
+        </article>
+
+        <!-- Hue tile -->
+        <article class="glass tile" data-domain="hue">
+          <div class="tile-head"><span class="tile-icon">💡</span><h3>Philips Hue</h3>
+            <span class="tile-badge" id="hueBadge">—</span></div>
+          <div class="tile-hero small"><span id="hueSummary">No lights on</span></div>
+          <div class="room-chips" id="hueRooms"><!-- JS --></div>
+          <div class="btn-row">
+            <button class="glass-btn accent-amber" onclick="quickTool('hue_scene',{scene:'morning-warm',room:'all'})">☀ Morning</button>
+            <button class="glass-btn accent-amber" onclick="quickTool('hue_scene',{scene:'relax-evening',room:'all'})">🕯 Relax</button>
+            <button class="glass-btn danger" onclick="quickTool('hue_lights',{target:'all',on:false})">All Off</button>
+          </div>
+        </article>
+
+        <!-- Spotify tile -->
+        <article class="glass tile" data-domain="spotify">
+          <div class="tile-head"><span class="tile-icon">🎵</span><h3>Spotify Connect</h3>
+            <span class="tile-badge" id="spBadge">idle</span></div>
+          <div class="track-info">
+            <div class="album-disc" id="disc"><i></i></div>
+            <div class="track-text">
+              <strong id="spTrack">—</strong>
+              <span id="spArtist">—</span>
+              <div class="progress"><div id="spProgress"></div></div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="glass-btn" onclick="quickTool('spotify_playback',{action:'previous'})">⏮</button>
+            <button class="glass-btn accent-green play-toggle" onclick="quickTool('spotify_playback',{action:'toggle'})" id="spPlayBtn">▶</button>
+            <button class="glass-btn" onclick="quickTool('spotify_playback',{action:'next'})">⏭</button>
+            <button class="glass-btn accent-violet" onclick="quickTool('spotify_playlist',{operation:'play_named',name:'morning-vibes'})">Morning Vibes</button>
+          </div>
+        </article>
+
+        <!-- Roidmi tile -->
+        <article class="glass tile" data-domain="roidmi">
+          <div class="tile-head"><span class="tile-icon">🤖</span><h3>Roidmi Eve</h3>
+            <span class="tile-badge" id="vacBadge">idle</span></div>
+          <div class="tile-hero small"><span id="vacState">Standby</span></div>
+          <div class="meter"><label>Battery</label><div class="meter-bar"><i id="vacBatt" style="width:0%"></i></div><span id="vacBattTxt">--%</span></div>
+          <div class="meter"><label>Dustbin</label><div class="meter-bar"><i id="vacBin" class="warn" style="width:0%"></i></div><span id="vacBinTxt">--%</span></div>
+          <div class="btn-row">
+            <button class="glass-btn accent-blue" onclick="quickTool('roidmi_control',{action:'start'})">🧹 Clean</button>
+            <button class="glass-btn" onclick="quickTool('roidmi_control',{action:'stop'})">⏹ Stop</button>
+            <button class="glass-btn" onclick="quickTool('roidmi_control',{action:'return'})">⌂ Dock</button>
+          </div>
+        </article>
+
+        <!-- Withings tile -->
+        <article class="glass tile" data-domain="withings">
+          <div class="tile-head"><span class="tile-icon">⚖️</span><h3>Withings Scale</h3>
+            <span class="tile-badge" id="scaleBadge">—</span></div>
+          <div class="tile-hero"><span id="scaleWeight">--.- kg</span></div>
+          <p class="tile-meta" id="scaleMeta">body fat — · BMI — · HR —</p>
+          <button class="glass-btn accent-green" onclick="quickTool('withings_sync',{})">⟳ Sync Now</button>
+        </article>
+
+        <!-- Presence / Google Home tile -->
+        <article class="glass tile" data-domain="ha">
+          <div class="tile-head"><span class="tile-icon">📍</span><h3>Presence &amp; Google Home</h3>
+            <span class="tile-badge" id="presBadge">—</span></div>
+          <div class="tile-hero small"><span id="presState">Unknown</span></div>
+          <div class="btn-row">
+            <button class="glass-btn" onclick="quickTool('presence_check',{})">Check Who's Home</button>
+            <button class="glass-btn accent-teal" onclick="announcePrompt()">🔊 Announce…</button>
+          </div>
+        </article>
+      </div>
+
+      <!-- Quick routines strip -->
+      <div class="glass routine-strip">
+        <h3 class="strip-title">Autonomous Scenarios</h3>
+        <div class="btn-row wrap">
+          <button class="glass-btn big accent-amber" onclick="runRoutine('morning')">🌅 Morning Routine</button>
+          <button class="glass-btn big accent-indigo" onclick="runRoutine('evening_winddown')">🌙 Evening Wind-Down</button>
+          <button class="glass-btn big accent-blue" onclick="runRoutine('away_clean')">🤖 Away Cleaning</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════ TAB 2 · AGENT CHAT + LOGS ══════════════════ -->
+    <section id="page-agent" class="page">
+      <div class="agent-layout">
+        <div class="glass chat-panel">
+          <div class="chat-scroll" id="chatScroll"><!-- messages --></div>
+          <div class="chat-suggestions" id="chatSuggestions">
+            <button onclick="fillChat(this)">Dim the living room and play focus lo-fi</button>
+            <button onclick="fillChat(this)">Remind me to take out the trash in 30 minutes</button>
+            <button onclick="fillChat(this)">Is anyone home? If not, start the vacuum</button>
+            <button onclick="fillChat(this)">Summarise my health trends this month</button>
+          </div>
+          <form class="chat-input-row" onsubmit="sendChat(event)">
+            <button type="button" class="mic-btn" id="ttsToggleBtn" title="Agent voice (text-to-speech) on/off">🔊</button>
+            <input id="chatInput" class="glass-input" placeholder="Message Atlas… (typed input — no microphone)" autocomplete="off">
+            <button type="submit" class="glass-btn accent-violet send-btn">Send ↑</button>
+          </form>
+        </div>
+
+        <aside class="glass terminal-panel" id="terminalPanel">
+          <div class="term-head">
+            <span class="term-title">▚ Agent Thought Process</span>
+            <div class="term-lights"><i class="tl r"></i><i class="tl y"></i><i class="tl g"></i></div>
+            <button class="term-collapse" onclick="document.getElementById('terminalPanel').classList.toggle('collapsed')">⇅</button>
+          </div>
+          <div class="term-scroll" id="termScroll"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ══════════════════ TAB 3 · TASK SCHEDULER ══════════════════ -->
+    <section id="page-tasks" class="page">
+      <div class="glass tasks-head">
+        <h2>Scheduled Tasks &amp; Automations</h2>
+        <button class="glass-btn accent-violet" onclick="openNewTaskModal()">＋ New Task</button>
+      </div>
+      <div id="taskList" class="task-list"><!-- draggable glass cards --></div>
+    </section>
+
+    <!-- ══════════════════ TAB 4 · ANALYTICS ══════════════════ -->
+    <section id="page-analytics" class="page">
+      <div class="tiles-grid two-col">
+        <article class="glass chart-card">
+          <h3>Body Composition Trend <small>Withings · last 90 days</small></h3>
+          <svg id="weightChart" viewBox="0 0 600 240" preserveAspectRatio="none" class="chart-svg"></svg>
+          <div class="legend"><span class="lg-weight">● Weight kg</span><span class="lg-fat">● Body fat %</span><span class="lg-hr">● Resting HR</span></div>
+        </article>
+        <article class="glass chart-card">
+          <h3>Home Energy Estimate <small>live device draw</small></h3>
+          <svg id="energyChart" viewBox="0 0 600 240" preserveAspectRatio="none" class="chart-svg"></svg>
+          <div class="legend"><span>Now: <b id="energyNow">— W</b></span><span id="energyBreak">—</span></div>
+        </article>
+      </div>
+      <div class="glass insight-card">
+        <h3>🧠 AI Health Insight</h3>
+        <p id="healthInsight">Ask Atlas in the Agent tab to analyse your trends — insights appear here.</p>
+      </div>
+    </section>
+
+    <!-- ══════════════════ TAB 5 · SETTINGS / SYSTEM ══════════════════ -->
+    <section id="page-settings" class="page">
+      <div class="tiles-grid sys-grid">
+        <article class="glass tile gauge-tile">
+          <h3>CPU Load</h3>
+          <div class="ring" id="cpuRing" style="--v:0"><span id="cpuVal">--%</span></div>
+          <p class="tile-meta" id="cpuCores">— cores</p>
+        </article>
+        <article class="glass tile gauge-tile">
+          <h3>Memory</h3>
+          <div class="ring" id="ramRing" style="--v:0"><span id="ramVal">--%</span></div>
+          <p class="tile-meta" id="ramDetail">— / — MB</p>
+        </article>
+        <article class="glass tile gauge-tile">
+          <h3>SoC Temperature</h3>
+          <div class="ring hot" id="tempRing" style="--v:0"><span id="tempVal">--°C</span></div>
+          <p class="tile-meta">throttle at 80 °C</p>
+        </article>
+        <article class="glass tile">
+          <h3>Network</h3>
+          <div class="kv"><span>LAN IP</span><b id="netIp">—</b></div>
+          <div class="kv"><span>Uptime</span><b id="uptime">—</b></div>
+          <div class="kv"><span>Net ↓/↑</span><b id="netIO">—</b></div>
+          <div class="kv"><span>Disk</span><b id="disk">—</b></div>
+          <div class="kv"><span>Est. power</span><b id="powerW">—</b></div>
+          <div class="kv"><span>Ollama</span><b id="ollamaState">—</b></div>
+        </article>
+        <article class="glass tile wide">
+          <h3>Registered Agent Tools</h3>
+          <div id="toolList" class="tool-chips">loading…</div>
+        </article>
+
+        <!-- ═══ VOICE · TEXT-TO-SPEECH (no speech-to-text — no mic) ═══ -->
+        <article class="glass tile wide voice-tile">
+          <h3>🗣 Voice — Text to Speech</h3>
+          <p class="tile-meta">Atlas speaks its replies. There is no voice input: this deployment has no microphone.</p>
+          <div class="voice-grid">
+            <label class="switch-row"><span>Auto-speak replies</span>
+              <label class="switch"><input type="checkbox" id="ttsEnabledSw" checked><span class="slider"></span></label>
+            </label>
+            <label>Language
+              <select id="ttsLangSel" class="glass-input">
+                <option value="en-US">English (US)</option><option value="en-GB">English (UK)</option>
+                <option value="lv-LV">Latviešu</option><option value="de-DE">Deutsch</option>
+                <option value="ru-RU">Русский</option><option value="lt-LT">Lietuvių</option>
+                <option value="es-ES">Español</option><option value="fr-FR">Français</option>
+              </select>
+            </label>
+            <label>Rate <input id="ttsRateInp" class="glass-input" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+            <label>Pitch <input id="ttsPitchInp" class="glass-input" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+          </div>
+          <div class="btn-row">
+            <button class="glass-btn" onclick="testTTS()">▶ Test voice</button>
+            <button class="glass-btn accent-violet" onclick="saveTTSSettings()">Save</button>
+          </div>
+          <p class="tile-meta" id="ttsEngineInfo">engine: —</p>
+        </article>
+
+        <!-- ═══ SKILLS · GITHUB / CLAWHUB INSTALLER ═══ -->
+        <article class="glass tile wide skills-tile">
+          <h3>🧩 Skills &amp; Autonomy</h3>
+          <p class="tile-meta">The agent can install skills from GitHub / ClawHub itself, author new tools with write_skill, edit its own code and use Bluetooth — maximum autonomy is enabled.</p>
+          <div class="skill-install-row">
+            <input id="skillSource" class="glass-input" placeholder="github.com/owner/repo/blob/main/skill.py  or  clawhub.ai/skills/my-skill">
+            <button class="glass-btn accent-violet" onclick="installSkill()">Install ↓</button>
+          </div>
+          <div id="skillList" class="skill-list">loading…</div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <!-- floating log toggle for mobile -->
+  <button class="fab glass" id="fabTerm" title="Agent logs">▚</button>
+
+  <!-- ═══════════ NEW TASK MODAL ═══════════ -->
+  <div class="modal-backdrop hidden" id="taskModal">
+    <div class="glass modal">
+      <h3>New Scheduled Task</h3>
+      <label>Name<input id="tkName" class="glass-input" placeholder="Water the plants"></label>
+      <label>When
+        <select id="tkKind" class="glass-input">
+          <option value="date">One-time at date/time</option>
+          <option value="cron">Recurring (cron)</option>
+          <option value="interval">Interval (minutes)</option>
+        </select>
+      </label>
+      <input id="tkExpr" class="glass-input" placeholder="2026-10-19T08:00 | 0 8 * * 1-5 | 30">
+      <label>Action
+        <select id="tkAction" class="glass-input">
+          <option value="agent_prompt">Tell the agent to…</option>
+          <option value="routine">Run a scenario</option>
+        </select>
+      </label>
+      <input id="tkPayload" class="glass-input" placeholder="e.g. remind me to water the plants">
+      <div class="btn-row">
+        <button class="glass-btn" onclick="closeModal()">Cancel</button>
+        <button class="glass-btn accent-violet" onclick="createTask()">Schedule ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast glass"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
